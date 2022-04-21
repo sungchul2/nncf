@@ -123,15 +123,22 @@ class COCODataset(data.Dataset):
             logger.error("error: no annotation on image")
             sys.exit(-1)
 
-        if self.target_transform is not None:
+        if self.target_transform is not None: # ?
             annotation = self.target_transform(self.annotation, width, height)
 
         if self.transform is not None:
-            img, boxes, labels = self.transform(img, boxes, labels)
-            if self.rgb:
-                img = img[:, :, (2, 1, 0)]
-            annotation = np.hstack((boxes, np.expand_dims(labels, axis=1)))
-        return torch.from_numpy(img).permute(2, 0, 1), annotation, height, width
+            # img, boxes, labels = self.transform(img, boxes, labels)
+            # img, boxes, labels = self.transform(img, target)
+            target = [{'bbox': b.tolist(), 'label_idx': l.tolist()} 
+                      for b, l in zip(boxes, labels)]
+            img, target = self.transform(img, target)
+            # if self.rgb:
+            #     img = img[:, :, (2, 1, 0)]
+            # annotation = np.hstack((boxes, np.expand_dims(labels, axis=1)))
+            
+        ## If there is not annotation?
+        # return torch.from_numpy(img).permute(2, 0, 1), annotation, height, width
+        return img, target, height, width
 
     def pull_image(self, index):
         return cv2.imread(list(self.annotation.keys())[index], cv2.IMREAD_COLOR)
