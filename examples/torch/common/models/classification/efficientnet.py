@@ -21,7 +21,7 @@ wrapper = register_module()
 wrapper(Conv2dStaticSamePadding)
 
 
-def efficient_net(pretrained=True, num_classes=1000, **kwargs):
+def efficient_net(model_name, pretrained=True, num_classes=1000, **kwargs):
     if pretrained:
-        return EfficientNet.from_pretrained(num_classes=num_classes, **kwargs)
-    return EfficientNet.from_name(num_classes=num_classes, **kwargs)
+        return EfficientNet.from_pretrained(model_name, num_classes=num_classes, **kwargs)
+    return EfficientNet.from_name(model_name, num_classes=num_classes, **kwargs)

@@ -41,6 +41,9 @@ def load_model(model, pretrained=True, num_classes=1000, model_params=None,
     if model in torchvision.models.__dict__:
         load_model_fn = partial(torchvision.models.__dict__[model], num_classes=num_classes, pretrained=pretrained,
                                 **model_params)
+    elif 'efficientnet' in model:
+        load_model_fn = partial(custom_models.__dict__['efficient_net'], model, num_classes=num_classes, pretrained=pretrained,
+                                **model_params)
     elif model in custom_models.__dict__:
         load_model_fn = partial(custom_models.__dict__[model], num_classes=num_classes, pretrained=pretrained,
                                 **model_params)
