@@ -1,104 +1,107 @@
-
-### Uniform Quantization with Fine-Tuning
+# Uniform Quantization with Fine-Tuning
 
 A uniform "fake" quantization method supports an arbitrary number of bits (>=2) which is used to represent weights and activations.
 The method performs differentiable sampling of the continuous signal (for example, activations or weights) during forward pass, simulating inference with integer arithmetic.
 
-#### Common Quantization Formula
+## Common Quantization Formula
 
 Quantization is parametrized by clamping range and number of quantization levels. The sampling formula is the following:
 
-![ZP = \lfloor-input\_low * s\rceil](https://latex.codecogs.com/png.image?%5Cdpi%7B110%7D%20ZP%20=%20%5Clfloor-input%5C_low%20*%20s%5Crceil)
+$$\text{output} = \frac{\left\lfloor (\text{clamp}(\text{input}; \text{input\_low}, \text{input\_high})-\text{input\_low})  *s - ZP \right \rceil}{s}$$
 
-![output = \frac{\left\lfloor (clamp(input; input\_low, input\_high)-input\_low)  *s - ZP \right \rceil}{s}\\](https://latex.codecogs.com/png.image?%5Cdpi%7B110%7D%20output%20=%20%5Cfrac%7B%5Cleft%5Clfloor%20(clamp(input;%20input%5C_low,%20input%5C_high)-input%5C_low)%20%20*s%20-%20ZP%20%5Cright%20%5Crceil%7D%7Bs%7D)
+$$\text{clamp}(\text{input}; \text{input\_low}, \text{input\_high}) = \min(\max(\text{input}, \text{input\_low}), \text{input\_high})$$
 
-![clamp(input; input\_low, input\_high) = min(max(input, input\_low), input\_high)))](https://latex.codecogs.com/png.latex?clamp%28input%3B%20input%5C_low%2C%20input%5C_high%29%20%3D%20min%28max%28input%2C%20input%5C_low%29%2C%20input%5C_high%29%29%29)
+$$s=\frac{\text{levels}-1}{\text{input\_high} - \text{input\_low}}$$
 
-![s=\frac{levels-1}{input\_high - input\_low}](https://latex.codecogs.com/png.latex?s%3D%5Cfrac%7Blevels-1%7D%7Binput%5C_high%20-%20input%5C_low%7D)
+$$ZP = \lfloor-\text{input\_low} * s\rceil$$
 
-`input_low` and `input_high` represent the quantization range and ![\left\lfloor\cdot\right \rceil](https://latex.codecogs.com/png.latex?%5Cleft%5Clfloor%5Ccdot%5Cright%20%5Crceil) denotes rounding to the nearest integer.
+`input_low` and `input_high` represent the quantization range, $\left\lfloor\cdot\right \rceil$ denotes rounding to the nearest integer, and $s$ and $ZP$ is scale and zero-point respectively, which are usually used as quantization parameters.
 
-####  Symmetric Quantization
+### Symmetric Quantization
 
-During the training, we optimize the **scale** parameter that represents the range `[input_low, input_range]` of the original signal using gradient descent:
+During the training, we optimize the **scale** ($s$) parameter that represents the range `[input_low, input_high]` of the original signal using gradient descent:
 
-![input\_low=scale*\frac{level\_low}{level\_high}](https://latex.codecogs.com/png.latex?input%5C_low%3Dscale*%5Cfrac%7Blevel%5C_low%7D%7Blevel%5C_high%7D)
+$$\text{input\_low}=\text{scale}*\frac{\text{level\_low}}{\text{level\_high}}$$
 
-![input\_high=scale](https://latex.codecogs.com/png.latex?input%5C_high%3Dscale)
+$$\text{input\_high}=\text{scale}$$
 
 In the formula above, `level_low` and `level_high` represent the range of the discrete signal.
- - For weights:
+ - For weights:  
+    $
+    \text{level\_low} = -2^{\text{bits} - 1} + 1 \\
+    \text{level\_high} = 2^{\text{bits} - 1} - 1 \\
+    \text{levels} = 255
+    $
 
-    ![level\_low=-2^{bits-1}+1](https://latex.codecogs.com/png.latex?%5Cinline%20%5Cdpi%7B120%7D%20level%5C_low%3D-2%5E%7Bbits-1%7D&plus;1),
+ - For unsigned activations:  
+    $
+    \text{level\_low} = 0 \\
+    \text{level\_high} = 2^{\text{bits}} - 1 \\
+    \text{levels} = 256
+    $
 
-    ![level\_high=2^{bits-1}-1](https://latex.codecogs.com/png.latex?%5Cinline%20%5Cdpi%7B120%7D%20level%5C_high%3D2%5E%7Bbits-1%7D-1)
-
-    ![levels=255](https://latex.codecogs.com/png.latex?levels%3D255)
-
- - For unsigned activations:
-
-    ![level\_low=0](https://latex.codecogs.com/png.latex?%5Cinline%20%5Cdpi%7B120%7D%20level%5C_low%3D0)
-
-    ![level\_high=2^{bits}-1](https://latex.codecogs.com/png.latex?%5Cinline%20%5Cdpi%7B120%7D%20level%5C_high%3D2%5E%7Bbits%7D-1)
-
-    ![levels=256](https://latex.codecogs.com/png.latex?levels%3D256)
-
- - For signed activations:
-
-    ![level\_low=-2^{bits-1}](https://latex.codecogs.com/png.latex?%5Cdpi%7B120%7D%20level%5C_low%3D-2%5E%7Bbits-1%7D)
-
-    ![level\_high=2^{bits-1}-1](https://latex.codecogs.com/png.latex?%5Cinline%20%5Cdpi%7B120%7D%20level%5C_high%3D2%5E%7Bbits-1%7D-1)
-
-    ![levels=256](https://latex.codecogs.com/png.latex?levels%3D256)
+ - For signed activations:  
+    $
+    \text{level\_low} = -2^{\text{bits} - 1} \\
+    \text{level\_high} = 2^{\text{bits} - 1} - 1 \\
+    \text{levels} = 256
+    $
 
 For all the cases listed above, the common quantization formula is simplified after substitution of `input_low`, `input_high` and `levels`:
 
-![output = \left\lfloor clamp(input * \frac{level\_high}{scale}, level\_low, level\_high)\right \rceil * \frac{scale}{level\_high}](https://latex.codecogs.com/png.latex?output%20%3D%20%5Cleft%5Clfloor%20clamp%28input%20*%20%5Cfrac%7Blevel%5C_high%7D%7Bscale%7D%2C%20level%5C_low%2C%20level%5C_high%29%5Cright%20%5Crceil%20*%20%5Cfrac%7Bscale%7D%7Blevel%5C_high%7D)
+$$\text{output} = \left\lfloor \text{clamp}(\text{input} * \frac{\text{level\_high}}{\text{scale}}, \text{level\_low}, \text{level\_high})\right \rceil * \frac{\text{scale}}{\text{level\_high}}$$
 
 Use the `num_init_samples` parameter from the `initializer` group to initialize the values of `scale` and determine which activation should be signed or unsigned from the collected statistics using given number of samples.
 
-####  Asymmetric Quantization
+### Asymmetric Quantization
 
 During the training we optimize the **input_low** and **input_range** parameters using gradient descent:
 
-![input\_high=input\_low + input\_range](https://latex.codecogs.com/png.latex?input%5C_high%3Dinput%5C_low%20&plus;%20input%5C_range)
+$$\text{input\_high}=\text{input\_low} + \text{input\_range}$$
 
-![levels=256](https://latex.codecogs.com/png.latex?levels%3D256)
+$$\text{levels}=256$$
 
-![level\_low=0](https://latex.codecogs.com/png.latex?%5Cinline%20%5Cdpi%7B120%7D%20level%5C_low%3D0)
+$$\text{level\_low}=0$$
 
-![level\_high=2^{bits}-1](https://latex.codecogs.com/png.latex?%5Cinline%20%5Cdpi%7B120%7D%20level%5C_high%3D2%5E%7Bbits%7D-1)
+$$\text{level\_high}=2^{\text{bits}}-1$$
 
 For better accuracy, floating-point zero should be within quantization range and strictly mapped into quant (without rounding). Therefore, the following scheme is applied to ranges of weights and activations before quantization:
 
-![{input\_low}' = min(input\_low, 0)](https://latex.codecogs.com/png.latex?%7Binput%5C_low%7D%27%20%3D%20min%28input%5C_low%2C%200%29)
+$$\text{input\_low}' = \min(\text{input\_low}, 0)$$
 
-![{input\_high}' = max(input\_high, 0)](https://latex.codecogs.com/png.latex?%7Binput%5C_high%7D%27%20%3D%20max%28input%5C_high%2C%200%29)
+$$\text{input\_high}' = \max(\text{input\_high}, 0)$$
 
-![ZP= \left\lfloor \frac{-{input\_low}'*(levels-1)}{{input\_high}'-{input\_low}'} \right \rceil ](https://latex.codecogs.com/png.latex?ZP%3D%20%5Cleft%5Clfloor%20%5Cfrac%7B-%7Binput%5C_low%7D%27*%28levels-1%29%7D%7B%7Binput%5C_high%7D%27-%7Binput%5C_low%7D%27%7D%20%5Cright%20%5Crceil)
+$$ZP = \left\lfloor \frac{-{\text{input\_low}}'*(\text{levels}-1)}{{\text{input\_high}}'-{\text{input\_low}}'} \right \rceil$$
 
-![{input\_high}''=\frac{ZP-levels+1}{ZP}*{input\_low}'](https://latex.codecogs.com/png.latex?%7Binput%5C_high%7D%27%27%3D%5Cfrac%7BZP-levels+1%7D%7BZP%7D*%7Binput%5C_low%7D%27)
+$$\text{input\_high}''=\frac{ZP-\text{levels}+1}{ZP}*\text{input\_low}'$$
 
-![{input\_low}''=\frac{ZP}{ZP-levels+1}*{input\_high}'](https://latex.codecogs.com/png.latex?%7Binput%5C_low%7D%27%27%3D%5Cfrac%7BZP%7D%7BZP-levels+1%7D*%7Binput%5C_high%7D%27)
+$$\text{input\_low}''=\frac{ZP}{ZP-\text{levels}+1}*\text{input\_high}'$$
 
-![{input\_low,input\_high} = \begin{cases} {input\_low}',{input\_high}', & ZP \in $\{0,levels-1\}$ \\ {input\_low}',{input\_high}'', & {input\_high}'' - {input\_low}' > {input\_high}' - {input\_low}'' \\ {input\_low}'',{input\_high}', & {input\_high}'' - {input\_low}' <= {input\_high}' - {input\_low}''\\ \end{cases}](https://latex.codecogs.com/png.latex?%7Binput%5C_low%2Cinput%5C_high%7D%20%3D%20%5Cbegin%7Bcases%7D%20%7Binput%5C_low%7D%27%2C%7Binput%5C_high%7D%27%2C%20%26%20ZP%20%5Cin%20%24%5C%7B0%2Clevels-1%5C%7D%24%20%5C%5C%20%7Binput%5C_low%7D%27%2C%7Binput%5C_high%7D%27%27%2C%20%26%20%7Binput%5C_high%7D%27%27%20-%20%7Binput%5C_low%7D%27%20%3E%20%7Binput%5C_high%7D%27%20-%20%7Binput%5C_low%7D%27%27%20%5C%5C%20%7Binput%5C_low%7D%27%27%2C%7Binput%5C_high%7D%27%2C%20%26%20%7Binput%5C_high%7D%27%27%20-%20%7Binput%5C_low%7D%27%20%3C%3D%20%7Binput%5C_high%7D%27%20-%20%7Binput%5C_low%7D%27%27%5C%5C%20%5Cend%7Bcases%7D)
+$$
+\text{input\_low}, \text{input\_high} = 
+\begin{cases}
+\text{input\_low}', \text{input\_high}', & ZP \in \{0, \text{levels}-1\} \\
+\text{input\_low}', \text{input\_high}'', & \text{input\_high}'' - \text{input\_low}' > \text{input\_high}' - \text{input\_low}'' \\ 
+\text{input\_low}'', \text{input\_high}', & \text{input\_high}'' - \text{input\_low}' <= \text{input\_high}' - \text{input\_low}''
+\end{cases}
+$$
 
 You can use the `num_init_samples` parameter from the `initializer` group to initialize the values of `input_low` and `input_range` from the collected statistics using given number of samples.
 
-#### Quantizer setup and hardware config files
+## Quantizer setup and hardware config files
 NNCF allows to quantize models for best results on a given Intel hardware type when executed using OpenVINO runtime.
 To achieve this, the quantizer setup should be performed with following considerations in mind:
-1) every operation that can accept quantized inputs on a given HW (i.e. can be executed using quantized input values) should have its inputs quantized in NNCF
-2) the quantized inputs should be quantized with a configuration that is supported on a given HW for a given operation (e.g. per-tensor vs per-channel quantization, or 8 bits vs. 4 bits)
-3) for operations that are agnostic to quantization, the execution should handle quantized tensors rather than full-precision tensors.
-4) certain operation sequences will be runtime-optimized to execute in a single kernel call ("fused"), and additional quantizer insertion/quantization simulation within such operation sequences will be detrimental to overall performance
+1. every operation that can accept quantized inputs on a given HW (i.e. can be executed using quantized input values) should have its inputs quantized in NNCF
+2. the quantized inputs should be quantized with a configuration that is supported on a given HW for a given operation (e.g. per-tensor vs per-channel quantization, or 8 bits vs. 4 bits)
+3. for operations that are agnostic to quantization, the execution should handle quantized tensors rather than full-precision tensors.
+4. certain operation sequences will be runtime-optimized to execute in a single kernel call ("fused"), and additional quantizer insertion/quantization simulation within such operation sequences will be detrimental to overall performance
 
-These requirements are fulfilled by the quantizer propagation algorithm.
-The algorithm first searches the internal NNCF representation of the model's control flow graph for predefined patterns that are "fusable", and apply the fusing to the internal graph representation as well.
-Next, the operations in the graph that can be associated to input-quantizable operations on a given target hardware are assigned a single quantizer for each its quantizable activation input, with a number of possible quantizer configurations attached to it (that are feasible on target HW).
-The quantizers are then "propagated" against the data flow in the model's control flow graph as far as possible, potentially merging with other quantizers.
-Once all quantizers have reached a standstill in their propagation process, each will have a final (possibly reduced) set of possible quantizer configurations, from which a single one is either chosen manually, or using a precision initialization algorithm (which accepts the potential quantizer locations and associated potential quantizer configuration sets).
-The resulting configuration is then applied as a final quantizer setup configuration.
+These requirements are fulfilled by the quantizer propagation algorithm.  
+1. The algorithm first searches the internal NNCF representation of the model's control flow graph for predefined patterns that are "fusable", and apply the fusing to the internal graph representation as well.
+2. Next, the operations in the graph that can be associated to input-quantizable operations on a given target hardware are assigned a single quantizer for each its quantizable activation input, with a number of possible quantizer configurations attached to it (that are feasible on target HW).
+3. The quantizers are then "propagated" against the data flow in the model's control flow graph as far as possible, potentially merging with other quantizers.
+4. Once all quantizers have reached a standstill in their propagation process, each will have a final (possibly reduced) set of possible quantizer configurations, from which a single one is either chosen manually, or using a precision initialization algorithm (which accepts the potential quantizer locations and associated potential quantizer configuration sets).
+5. The resulting configuration is then applied as a final quantizer setup configuration.
 
 Note that this algorithm applies to activation quantization only - the weight quantizers do not require propagation.
 However, the possible configurations of weight quantizers themselves are also sourced from the HW config file definitions.
@@ -112,50 +115,49 @@ The quantization configuration in the `"target_device": "TRIAL"` case may be ove
 For all target HW types, parts of the model graph can be marked as non-quantizable by using the `"ignored_scopes"` field - inputs and weights of matching nodes in the NNCF internal graph representation will not be quantized, and the downstream quantizers will not propagate upwards through such nodes.
 
 
-#### Quantization Implementation
+## Quantization Implementation
 
 In our implementation, we use a slightly transformed formula. It is equivalent by order of floating-point operations to simplified symmetric formula and the assymetric one. The small difference is addition of small positive number `eps` to prevent division by zero and taking absolute value of range, since it might become negative on backward:
 
-![output = \frac{clamp(\left\lfloor (input-input\_low^{*}) *s - ZP \right \rceil, level\_low, level\_high)}{s}](https://latex.codecogs.com/svg.image?output%20=%20%5Cfrac%7Bclamp(%5Cleft%5Clfloor%20(input-input%5C_low%5E%7B*%7D)%20*s%20-%20ZP%20%5Cright%20%5Crceil,%20level%5C_low,%20level%5C_high)%7D%7Bs%7D)
+$$\text{output} = \frac{clamp(\left\lfloor (\text{input}-\text{input\_low}^{*}) * s - ZP \right \rceil, \text{level\_low}, \text{level\_high})}{s}$$
 
-![s = \frac{level\_high}{|input\_range^{*}| + eps}](https://latex.codecogs.com/png.latex?s%20%3D%20%5Cfrac%7Blevel%5C_high%7D%7B%7Cinput%5C_range%5E%7B*%7D%7C%20&plus;%20eps%7D)
+$$s = \frac{\text{level\_high}}{|\text{input\_range}^{*}| + \text{eps}}$$
 
-![ZP = \lfloor-input\_low * s\rceil](https://latex.codecogs.com/png.image?%5Cdpi%7B110%7D%20ZP%20=%20%5Clfloor-input%5C_low%5E%7B*%7D%20*%20s%5Crceil)
+$$ZP = \lfloor-\text{input\_low} * s\rceil$$
 
-For asymmetric:
-![\\input\_low^{*} = input\_low \\ input\_range^{*} = input\_range ](https://latex.codecogs.com/png.latex?%5C%5Cinput%5C_low%5E%7B*%7D%20%3D%20input%5C_low%20%5C%5C%20input%5C_range%5E%7B*%7D%20%3D%20input%5C_range)
+- For asymmetric:  
+$
+\text{input\_low}^{*} = \text{input\_low} \\ 
+\text{input\_range}^{*} = \text{input\_range}
+$
 
-For symmetric:
-![\\input\_low^{*} = 0 \\ input\_range^{*} = scale](https://latex.codecogs.com/png.latex?%5C%5Cinput%5C_low%5E%7B*%7D%20%3D%200%20%5C%5C%20input%5C_range%5E%7B*%7D%20%3D%20scale)
+- For symmetric:  
+$
+\text{input\_low}^{*} = 0 \\ 
+\text{input\_range}^{*} = \text{scale}
+$
 
----
-**NOTE**
-
-There is a known issue with AVX2 and AVX512 CPU devices. The issue appears with 8-bit matrix calculations with tensors which elements are close to the maximum or saturated.
+>**NOTE** : There is a known issue with AVX2 and AVX512 CPU devices. The issue appears with 8-bit matrix calculations with tensors which elements are close to the maximum or saturated.
 AVX2 and AVX512 utilize a 16-bit register to store the result of operations on tensors. In case when tensors are saturated the buffer overflow happens.
-This leads to accuracy degradation. For more details of the overflow issue please refer [here](https://www.intel.com/content/www/us/en/developer/articles/technical/lower-numerical-precision-deep-learning-inference-and-training.html).
-
+This leads to accuracy degradation. For more details of the overflow issue please refer [here](https://www.intel.com/content/www/us/en/developer/articles/technical/lower-numerical-precision-deep-learning-inference-and-training.html).  
 To fix this issue inside NNCF, by default, all weight tensors are quantized in 8 bits but only 7 bits are effectively used.
-This regime is used when `"target_device": "CPU"` or `"target_device": "ANY"` set. This fix, potentially, requires longer fine-tuning.
-
+This regime is used when `"target_device": "CPU"` or `"target_device": "ANY"` set. This fix, potentially, requires longer fine-tuning.  
 To control the application of overflow fix, `"overflow_fix"` config option is introduced. The default value is `"overflow_fix": "enable"`. To apply the overflow issue fix only to the first layer, use `"overflow_fix": "first_layer_only"`. To disable the overflow issue fix for all layers, use `"overflow_fix": "disable"`.
 
----
-
 <a name="mixed_precision_quantization"></a>
-#### Mixed-Precision Quantization
+## Mixed-Precision Quantization
 
 Quantization to lower precisions (e.g. 6, 4, 2 bits) is an efficient way to accelerate inference of neural networks.
 Although NNCF supports quantization with an arbitrary number of bits to represent weights and activations values,
 choosing ultra-low bitwidth could noticeably affect the model's accuracy. A good trade-off between accuracy and performance is achieved by assigning different precisions to different layers. NNCF provides two automatic precision assignment algorithms, namely **HAWQ** and **AutoQ**.
 
-#### HAWQ
+### HAWQ
 NNCF utilizes the [HAWQ-v2](https://arxiv.org/pdf/1911.03852.pdf) method to automatically choose optimal mixed-precision
 configuration by taking into account the sensitivity of each layer, i.e. how much lower-bit quantization of each layer
 decreases the accuracy of model. The most sensitive layers are kept at higher precision. The sensitivity of the i-th layer is
 calculated by multiplying the average Hessian trace with the L2 norm of quantization perturbation:
 
-![\overline{Tr}(H_{i}) * \left \| Q(W_{i}) - W_{i} \right \|^2_2](https://latex.codecogs.com/png.latex?%5Coverline%7BTr%7D%28H_%7Bi%7D%29%20*%20%5Cleft%20%5C%7C%20Q%28W_%7Bi%7D%29%20-%20W_%7Bi%7D%20%5Cright%20%5C%7C%5E2_2)
+$$\overline{Tr}(H_{i}) * \left \| Q(W_{i}) - W_{i} \right \|^2_2$$
 
 The sum of the sensitivities for each layer forms a metric which serves as a proxy to the accuracy of the compressed
 model: the lower the metric, the more accurate should be the corresponding mixed precision model on the validation
@@ -178,24 +180,22 @@ trace value are quantized to lower bitwidth and vice versa.
 The Hessian trace is estimated with the randomized [Hutchinson algorithm](https://www.researchgate.net/publication/220432178_Randomized_Algorithms_for_Estimating_the_Trace_of_an_Implicit_Symmetric_Positive_Semi-Definite_Matrix).
 Given Rademacher distributed random vector v, the trace of symmetric matrix H is equal to the estimation of a quadratic form:
 
-![Tr(H) = \mathbb{E}[v^T H v]](https://latex.codecogs.com/png.latex?Tr%28H%29%20%3D%20%5Cmathbb%7BE%7D%5Bv%5ET%20H%20v%5D)
+$$Tr(H) = \mathbb{E}[v^T H v]$$
 
 The randomized algorithm solves the expectation by Monte Carlo using sampling of v from its distribution, evaluating
 the quadratic term, and averaging:
 
-![Tr(H) \approx \frac{1}{m}\sum_{i=1}^{m}[v_i^T H v_i]](https://latex.codecogs.com/png.latex?Tr%28H%29%20%5Capprox%20%5Cfrac%7B1%7D%7Bm%7D%5Csum_%7Bi%3D1%7D%5E%7Bm%7D%5Bv_i%5ET%20H%20v_i%5D)
+$$Tr(H) \approx \frac{1}{m}\sum_{i=1}^{m}[v_i^T H v_i]$$
 
-Evaluation of the quadratic term happens by computing ![Hv](https://latex.codecogs.com/png.latex?Hv) - the result
+Evaluation of the quadratic term happens by computing $Hv$ - the result
 of multiplication of the Hessian matrix with a given random vector v, without the explicit formation of the Hessian operator.
-For gradient of the loss with respect to the i-th block ![g_i](https://latex.codecogs.com/png.latex?g_i) and for
-a random vector v, which is independent of ![W_i](https://latex.codecogs.com/png.latex?W_i), we have the equation:
+For gradient of the loss with respect to the i-th block $g_i$ and for
+a random vector v, which is independent of $W_i$, we have the equation:
 
-![\frac{\partial(g_i^T v)}{\partial  W_i} = H_i v](https://latex.codecogs.com/png.latex?%5Cfrac%7B%5Cpartial%28g_i%5ET%20v%29%7D%7B%5Cpartial%20W_i%7D%20%3D%20H_i%20v)
+$$\frac{\partial(g_i^T v)}{\partial  W_i} = H_i v$$
 
-where ![H_i](https://latex.codecogs.com/png.latex?H_i) is the Hessian matrix of loss with respect to
-![W_i](https://latex.codecogs.com/png.latex?W_i). Hence ![Hv](https://latex.codecogs.com/png.latex?Hv) can be
-computed by 2 backpropagation passes: first  - with respect to the loss and second - with respect to the product of the
-gradients and a random vector.
+where $H_i$ is the Hessian matrix of loss with respect to $W_i$. 
+Hence $Hv$ can be computed by 2 backpropagation passes: first - with respect to the loss and second - with respect to the product of the gradients and a random vector.
 
 The aforementioned procedure sets bitwidth for weight quantizers only. Bitwidth for activation quantizers is assigned
 on the next step in two ways: strict or liberal. All quantizers between modules with quantizable inputs have the same
@@ -241,15 +241,10 @@ ending by `*_staged` for an example of this method.
 The manual mode of mixed-precision quantization is also available by explicitly setting the bitwidth per layer
  through `bitwidth_per_scope` parameter.
 
----
-**NOTE**
-
-Precision initialization overrides bits settings specified in `weights` and `activations` sections of configuration
+>**NOTE** : Precision initialization overrides bits settings specified in `weights` and `activations` sections of configuration
 file.
 
----
-
-#### AutoQ
+### AutoQ
 NNCF provides an alternate mode, namely AutoQ, for mixed-precision automation. It is an AutoML-based technique that automatically learns the layer-wise bitwidth with explored experiences. Based on [HAQ](https://openaccess.thecvf.com/content_CVPR_2019/papers/Wang_HAQ_Hardware-Aware_Automated_Quantization_With_Mixed_Precision_CVPR_2019_paper.pdf), AutoQ utilizes an actor-critic algorithm, Deep Deterministic Policy Gradient (DDPG) for efficient search over the bitwidth space. DDPG is trained in an episodic fashion, converging to a deterministic mixed-precision policy after a number of episodes. An episode is constituted by stepping, the DDPG transitions from quantizer to quantizer sequentially to predict a precision of a layer. Each quantizer essentially denotes a state in RL framework and it is represented by attributes of the associated layers. For example, a quantizer for 2D Convolution is represented by its quantizer Id (integer), input and output channel size, feature map dimension, stride size, if it is depthwise, number of parameters etc. It is recommended to check out ```_get_layer_attr``` in [```quantization_env.py```](https://github.com/openvinotoolkit/nncf/blob/develop/nncf/automl/environment/quantization_env.py#L333) for the featurization of different network layer types.
 
 When the agent enters a state/quantizer, it receives the state features and forward passes them through its network. The output of the forward pass is a scalar continuous action output which is subsequently mapped to the bitwidth options of the particular quantizer. The episode terminates after the prediction of the last quantizer and a complete layer-wise mixed-precision policy is obtained. To ensure a policy fits in the user-specified compression ratio, the policy is post processed by reducing the precision sequentially from the last quantizer until the compression ratio is met.
@@ -297,7 +292,8 @@ Following is an example of wrapping ImageNet validation loop as a callback. Top5
             autoq_eval_fn, val_loader, config.device)
 ```
 
-#### Batch-norm statistics adaptation
+
+## Batch-norm statistics adaptation
 
 After the compression-related changes in the model have been committed, the statistics of the batchnorm layers
 (per-channel rolling means and variances of activation tensors) can be updated by passing several batches of data

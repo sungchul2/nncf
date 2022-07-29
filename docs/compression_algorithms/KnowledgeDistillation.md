@@ -1,6 +1,5 @@
-### Knowledge Distillation (experimental feature)
+# Knowledge Distillation (experimental feature)
 
-#### The algorithm description
 The Knowledge Distillation [Hinton et al., 2015](https://arxiv.org/pdf/1503.02531.pdf)
 implies that a small model (student) is trained to mimic a pre-trained large model (teacher) through knowledge 
 transfer. The goal is to improve the accuracy of the student network. 
@@ -13,30 +12,27 @@ Knowledge is transferred from the teacher model to the student one by minimizing
 based on predictions of the models. At the moment, two types of loss functions are available. 
 One of them should be explicitly specified in the config.
  
- MSE distillation loss:
+**MSE distillation loss**
+$${L}_{MSE}(z^{s}, z^{t}) = || z^s - z^t ||_2^2$$
  
- ![{L}_{MSE}(z^{s}, z^{t}) = || z^s - z^t ||_2^2](https://latex.codecogs.com/png.latex?{L}_{MSE}(z^{s},%20z^{t})%20=%20||%20z^s%20-%20z^t%20||_2^2)
+**Cross-Entropy distillation loss**
+$${p}_{i}=\frac{\exp({z}_{i})}{\sum_{j}(\exp({z}_{j}))}$$
+
+$${L}_{CE}({p}^{s}, {p}^{t}) = -\sum_{i}{p}^{t}_{i}*\log({p}^{s}_{i})$$
  
- Cross-Entropy distillation loss:
- 
- ![{p}_{i}=\frac{\exp({z}_{i})}{\sum_{j}(\exp({z}_{j}))}](https://latex.codecogs.com/png.latex?{p}_{i}=%20\frac{\exp({z}_{i})}{\sum_{j}(\exp({z}_{j}))})
- 
- ![{L}_{CE}({p}^{s}, {p}^{t}) = -\sum_{i}{p}^{t}_{i}*\log({p}^{s}_{i})](https://latex.codecogs.com/png.latex?{L}_{CE}({p}^{s},%20{p}^{t})%20=%20-\sum_{i}{p}^{t}_{i}*\log({p}^{s}_{i}))
- 
- The Knowledge Distillation loss function is combined with a regular loss function, so overall loss function will be
-  computed as:
-  
- ![L = {L}_{reg}({z}^{s}, y) + {L}_{distill}({z}^{s}, {z}^{t})](https://latex.codecogs.com/png.latex?L%20=%20{L}_{reg}({z}^{s},%20y)%20+%20{L}_{distill}({z}^{s},%20{z}^{t}))
-  
- ![kd_pic](../pics/knowledge_distillation.png)
-  
-  Note: the Cross-Entropy distillation loss was proposed in [Hinton et al., 2015](https://arxiv.org/pdf/1503.02531.pdf) 
-  with temperature parameter, but we don't use it or assume that T=1.
-  
-#### User guide
+The Knowledge Distillation loss function is combined with a regular loss function, so overall loss function will be computed as:
+$$L = {L}_{reg}({z}^{s}, y) + {L}_{distill}({z}^{s}, {z}^{t})$$
+
+![kd_pic](../pics/knowledge_distillation.png)
+
+>**NOTE** : The Cross-Entropy distillation loss was proposed in [Hinton et al., 2015](https://arxiv.org/pdf/1503.02531.pdf) with temperature parameter, but we don't use it or assume that $T = 1$.
+
+
+## User guide
 
 To turn on the Knowledge Distillation with some compression algorithm (e.g. filter_pruning) it's necessary to
 specify `knowledge_distillation` algorithm and its type in the config:
+
 ```
 {
     ...
@@ -54,7 +50,7 @@ specify `knowledge_distillation` algorithm and its type in the config:
 ```
 Example of a config: [example](../../examples/torch/classification/configs/pruning/resnet34_pruning_geometric_median_kd.json)
 
-##### Limitations
+### Limitations
 
 - The algorithm is supported for PyTorch only.
 
