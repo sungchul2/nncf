@@ -1,9 +1,9 @@
 # Early Exit training loop in NNCF
 
-Early Exit training loop aims to get the compressed model with the desired accuracy criteria as earlier as possible. This is done by checking a compressed model accuracy after each training epoch step and also after the initialization step then exits the fine-tuning process once the accuracy reaches the user-defined criteria
+Early Exit training loop aims to get the compressed model with the desired accuracy criteria as earlier as possible. This is done by checking a compressed model accuracy after each training epoch step and also after the initialization step then exits the fine-tuning process once the accuracy reaches the user-defined criteria.  
 This pipeline is simple but effective. It reduces a fine-tuning time for many models till just an initialization step. 
 
-Note: since the EarlyExit training does not control any compression parameter the specified accuracy criterium cannot be satisfied in some cases
+>**Note** : Since the EarlyExit training does not control any compression parameter the specified accuracy criterium cannot be satisfied in some cases.
 
 This training loop supports any combination of NNCF compression algorithms.
 
